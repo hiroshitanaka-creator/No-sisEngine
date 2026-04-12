@@ -1,0 +1,284 @@
+{
+  "issues": [
+    {
+      "id": "T001",
+      "title": "scaffold: pyproject, package skeleton, AGPL-3.0 license",
+      "file": "pyproject.toml",
+      "deps": [],
+      "description": "Create the Python package skeleton: pyproject.toml with build-system, project metadata (name=noesis-engine, python>=3.10, license=AGPL-3.0), optional extras [audio,openai,anthropic,local,dev]. Create empty noesis_engine/__init__.py exposing __version__. Add tests/ directory with __init__.py. Add LICENSE file (AGPL-3.0). No runtime logic yet.",
+      "acceptance_criteria": "pip install -e .[dev] succeeds. pytest runs (collects 0 tests). import noesis_engine works and exposes __version__. No dependency on Po_core anywhere."
+    },
+    {
+      "id": "T002",
+      "title": "core: data types and exceptions",
+      "file": "noesis_engine/core/types.py",
+      "deps": ["T001"],
+      "description": "Define dataclasses / Pydantic models for Utterance, DecomposedUtterance, ConflictCategory (Enum: ETHICAL, RESOURCE, TEMPORAL, VALUE, METHODOLOGICAL), AxisVector, SpeakerAnalysis, MinorityEvaluation, NoesisOutput. Also create noesis_engine/core/exceptions.py with NoesisError base plus PersonaNotFoundError, CategoryClassificationError, LLMBackendError.",
+      "acceptance_criteria": "Unit tests instantiate every type with valid and invalid payloads. mypy --strict passes on core/types.py. No external side effects."
+    },
+    {
+      "id": "T003",
+      "title": "llm: abstract LLMClient base",
+      "file": "noesis_engine/llm/base.py",
+      "deps": ["T002"],
+      "description": "Define abstract LLMClient with chat(system_prompt, messages, schema=None, temperature=0.0) -> StructuredResponse. Define Message, StructuredResponse dataclasses. No concrete backend. Include deterministic FakeLLMClient for tests that returns canned JSON per prompt pattern.",
+      "acceptance_criteria": "Subclass FakeLLMClient usable in tests. Schema validation enforced when schema given. Raises LLMBackendError on malformed structured output."
+    },
+    {
+      "id": "T004",
+      "title": "llm: Anthropic client",
+      "file": "noesis_engine/llm/anthropic_client.py",
+      "deps": ["T003"],
+      "description": "Implement AnthropicClient(LLMClient) using the anthropic SDK. Respect schema argument via tool-use or response_format. Read API key from config / env. Guard import so the package still imports when anthropic is not installed (raise only on instantiation).",
+      "acceptance_criteria": "Integration test (skipped without ANTHROPIC_API_KEY) returns parsed JSON. Unit test with mocked SDK passes. Importing noesis_engine without anthropic installed still works."
+    },
+    {
+      "id": "T005",
+      "title": "llm: OpenAI client",
+      "file": "noesis_engine/llm/openai_client.py",
+      "deps": ["T003"],
+      "description": "Implement OpenAIClient(LLMClient) using the openai SDK with structured outputs (JSON schema). Same lazy-import guard pattern as T004.",
+      "acceptance_criteria": "Unit test with mocked SDK passes. Lazy import verified. Schema enforced."
+    },
+    {
+      "id": "T006",
+      "title": "llm: local client stub",
+      "file": "noesis_engine/llm/local_client.py",
+      "deps": ["T003"],
+      "description": "Implement LocalLLMClient(LLMClient) stub that documents the adapter target (llama-cpp-python / vLLM). Raise NotImplementedError with a clear message on instantiation. Provide the method signatures so future swap-in is frictionless.",
+      "acceptance_criteria": "Instantiation raises NotImplementedError with guidance text. Class importable and registered in llm package."
+    },
+    {
+      "id": "T007",
+      "title": "persona: Persona abstract base and prompt contract",
+      "file": "noesis_engine/persona/base.py",
+      "deps": ["T003"],
+      "description": "Define Persona ABC with attributes: id, display_name, philosophical_tradition, axes (list[str]). Method build_system_prompt() -> str. Method analyze(client: LLMClient, utterances: list[DecomposedUtterance]) -> list[AxisVector]. The base encodes the JSON output schema so every persona returns the same shape.",
+      "acceptance_criteria": "ABC enforces required fields. analyze() uses a shared JSON schema. Unit test uses FakeLLMClient and a trivial subclass."
+    },
+    {
+      "id": "T008",
+      "title": "persona: Kantian",
+      "file": "noesis_engine/persona/definitions/kantian.py",
+      "deps": ["T007"],
+      "description": "Implement KantianPersona. Axes: duty, universalizability, autonomy, dignity, constraint_respect. System prompt grounds reasoning in the categorical imperative and treatment of persons as ends. No decorative philosophy: each axis must map to a concrete question the persona asks of an utterance.",
+      "acceptance_criteria": "Unit test with FakeLLMClient validates axis keys match the declared axes list. Prompt does not reference other personas."
+    },
+    {
+      "id": "T009",
+      "title": "persona: Aristotelian",
+      "file": "noesis_engine/persona/definitions/aristotelian.py",
+      "deps": ["T007"],
+      "description": "Implement AristotelianPersona. Axes: virtue, excellence, telos, phronesis, mean. Prompt grounds reasoning in eudaimonia and character.",
+      "acceptance_criteria": "Axis keys stable across runs. Schema validation passes."
+    },
+    {
+      "id": "T010",
+      "title": "persona: Cartesian",
+      "file": "noesis_engine/persona/definitions/cartesian.py",
+      "deps": ["T007"],
+      "description": "Implement CartesianPersona. Axes: method, clarity, distinctness, systematic_doubt, decomposition. Prompt grounds reasoning in the method of Discourse on Method.",
+      "acceptance_criteria": "Stable output shape. Prompt is method-centric, not epistemology-centric."
+    },
+    {
+      "id": "T011",
+      "title": "persona: Hegelian",
+      "file": "noesis_engine/persona/definitions/hegelian.py",
+      "deps": ["T007"],
+      "description": "Implement HegelianPersona. Axes: development, contradiction, synthesis, historical_trajectory, possibility.",
+      "acceptance_criteria": "Axis keys stable. Prompt explicitly frames statements as moments in a dialectic."
+    },
+    {
+      "id": "T012",
+      "title": "persona: Utilitarian",
+      "file": "noesis_engine/persona/definitions/utilitarian.py",
+      "deps": ["T007"],
+      "description": "Implement UtilitarianPersona. Axes: aggregate_utility, consequence_breadth, preference_satisfaction, scope_of_moral_patients, marginal_impact.",
+      "acceptance_criteria": "Stable output. Prompt avoids mixing with deontology."
+    },
+    {
+      "id": "T013",
+      "title": "persona: Deontological",
+      "file": "noesis_engine/persona/definitions/deontological.py",
+      "deps": ["T007"],
+      "description": "Implement DeontologicalPersona. Axes: rule_adherence, rights_protection, prohibition_strength, role_obligation, procedural_justice. Distinct from Kantian: rule-centric rather than universalizability-centric.",
+      "acceptance_criteria": "Prompt explicitly contrasts rule-following with universalization so overlap with Kantian is minimized."
+    },
+    {
+      "id": "T014",
+      "title": "persona: VirtueEthics",
+      "file": "noesis_engine/persona/definitions/virtue_ethics.py",
+      "deps": ["T007"],
+      "description": "Implement VirtueEthicsPersona. Axes: character_trait_weight, practical_wisdom, community_context, role_excellence, habit_formation. Distinct from Aristotelian: trait-focused rather than telos-focused.",
+      "acceptance_criteria": "Axis keys distinct from Aristotelian. Tests confirm no key overlap."
+    },
+    {
+      "id": "T015",
+      "title": "persona: Existentialist",
+      "file": "noesis_engine/persona/definitions/existentialist.py",
+      "deps": ["T007"],
+      "description": "Implement ExistentialistPersona. Axes: authenticity, freedom, responsibility, finitude, project_commitment.",
+      "acceptance_criteria": "Prompt anchors on authentic choice under finitude."
+    },
+    {
+      "id": "T016",
+      "title": "persona: Pragmatist",
+      "file": "noesis_engine/persona/definitions/pragmatist.py",
+      "deps": ["T007"],
+      "description": "Implement PragmatistPersona. Axes: workability, experimental_attitude, consequence_in_practice, fallibilism, community_of_inquiry.",
+      "acceptance_criteria": "Prompt focuses on what difference the claim makes in practice."
+    },
+    {
+      "id": "T017",
+      "title": "persona: registry",
+      "file": "noesis_engine/persona/registry.py",
+      "deps": ["T008","T009","T010","T011","T012","T013","T014","T015","T016"],
+      "description": "Provide PERSONA_REGISTRY: dict[str, type[Persona]] mapping ids to classes. Expose get_persona(id) and list_personas(). Registry is the single source of truth for selector and API.",
+      "acceptance_criteria": "All nine personas registered. get_persona raises PersonaNotFoundError on unknown id. list_personas returns stable ordering."
+    },
+    {
+      "id": "T018",
+      "title": "input: text loader",
+      "file": "noesis_engine/input/text_loader.py",
+      "deps": ["T002"],
+      "description": "Implement load_text(path_or_str, format='auto') -> list[Utterance]. Support JSON list of {speaker_id, text, timestamp?} and a simple 'Speaker: text' plain-text format.",
+      "acceptance_criteria": "Round-trip test for both formats. Malformed input raises ValueError with a line pointer."
+    },
+    {
+      "id": "T019",
+      "title": "input: speaker separator (text mode)",
+      "file": "noesis_engine/input/speaker_separator.py",
+      "deps": ["T018"],
+      "description": "Given a list of Utterance, group by speaker_id preserving order. If speaker_id is missing or equals 'unknown', do not fabricate IDs; flag them for downstream handling.",
+      "acceptance_criteria": "Group ordering matches input order. Unknown speakers surface as a separate bucket with a warning."
+    },
+    {
+      "id": "T020",
+      "title": "input: audio loader (Whisper, optional extra)",
+      "file": "noesis_engine/input/audio_loader.py",
+      "deps": ["T019"],
+      "description": "Implement load_audio(path) -> list[Utterance]. Use openai-whisper or faster-whisper (behind the [audio] extra). Diarization via pyannote is out of scope for v1; use a naive segmenter and label speakers as 'S1','S2' in deterministic order.",
+      "acceptance_criteria": "Lazy import so core works without audio extra installed. Integration test uses a short bundled wav fixture."
+    },
+    {
+      "id": "T021",
+      "title": "decomposition: utterance decomposer",
+      "file": "noesis_engine/decomposition/utterance_decomposer.py",
+      "deps": ["T003"],
+      "description": "Implement decompose(utterances, client) -> list[DecomposedUtterance]. Uses the LLM with a fixed JSON schema producing claims, premises, implicit_values. Temperature 0.0.",
+      "acceptance_criteria": "Schema enforced. FakeLLMClient test exercises all fields. Deterministic given identical fake responses."
+    },
+    {
+      "id": "T022",
+      "title": "classification: category classifier (Stage 1)",
+      "file": "noesis_engine/classification/category_classifier.py",
+      "deps": ["T003"],
+      "description": "Implement classify(decomposed, client) -> ConflictCategory. JSON-schema-constrained single-label output. On ambiguity, raises CategoryClassificationError rather than guessing.",
+      "acceptance_criteria": "Exactly one of the five categories returned. Invalid labels raise the dedicated exception."
+    },
+    {
+      "id": "T023",
+      "title": "persona: selector (Stage 2)",
+      "file": "noesis_engine/persona/selector.py",
+      "deps": ["T017","T022"],
+      "description": "Implement select_personas(category) -> list[Persona]. Hard-coded allocation table: ETHICAL->[Kantian,Utilitarian,VirtueEthics]; RESOURCE->[Utilitarian,Deontological,VirtueEthics]; TEMPORAL->[Existentialist,Pragmatist,Hegelian]; VALUE->[Kantian,Aristotelian,Hegelian]; METHODOLOGICAL->[Cartesian,Pragmatist,Aristotelian]. No LLM call. No override hook.",
+      "acceptance_criteria": "Table is immutable (tuple). Tests assert exact persona ids per category. Attempting to mutate raises."
+    },
+    {
+      "id": "T024",
+      "title": "analysis: axis analyzer",
+      "file": "noesis_engine/analysis/axis_analyzer.py",
+      "deps": ["T007","T017","T003"],
+      "description": "Implement analyze_axes(decomposed, personas, client) -> list[AxisVector]. For every (persona, speaker) pair, call persona.analyze and collect vectors. Fail loud on schema violation.",
+      "acceptance_criteria": "N_speakers * N_personas vectors produced. Stable ordering. FakeLLMClient covers success and malformed output."
+    },
+    {
+      "id": "T025",
+      "title": "analysis: vector math",
+      "file": "noesis_engine/analysis/vector_math.py",
+      "deps": ["T002"],
+      "description": "Pure functions: pairwise_diff(vectors) -> dict[(speaker_a,speaker_b), float], intersection_axes(vectors, threshold) -> list[str], cluster(vectors) -> list[list[str]]. Distance uses axis-aligned cosine over the union of axis keys (missing -> 0).",
+      "acceptance_criteria": "100% unit-tested pure functions. No LLM, no IO. Deterministic."
+    },
+    {
+      "id": "T026",
+      "title": "analysis: minority evaluator",
+      "file": "noesis_engine/analysis/minority_evaluator.py",
+      "deps": ["T024","T003"],
+      "description": "Given all utterances plus which were rejected (input-provided or inferred from clustering), ask the LLM per-persona to score philosophical_value in [0,1], rejection_reason_structural, preserved_insight. Never drops a rejected utterance.",
+      "acceptance_criteria": "Every rejected utterance produces a MinorityEvaluation. Values outside [0,1] rejected by schema."
+    },
+    {
+      "id": "T027",
+      "title": "output: schemas and formatter",
+      "file": "noesis_engine/output/formatter.py",
+      "deps": ["T002","T025","T026"],
+      "description": "Assemble NoesisOutput from pipeline stage results. Provide to_json(output), to_markdown(output). Markdown presents intersection points as suggestions, never as prescriptions.",
+      "acceptance_criteria": "Golden-file tests for both renderers. Markdown contains a non-coercion notice."
+    },
+    {
+      "id": "T028",
+      "title": "config: settings and env loading",
+      "file": "noesis_engine/config.py",
+      "deps": ["T001"],
+      "description": "Pydantic Settings (pydantic-settings) with fields: llm_backend ('anthropic'|'openai'|'local'|'fake'), api keys, default_temperature, audio_enabled. Loads .env if present.",
+      "acceptance_criteria": "Missing backend key surfaces a clear error only when a real backend is instantiated, not at import time."
+    },
+    {
+      "id": "T029",
+      "title": "core: pipeline orchestrator",
+      "file": "noesis_engine/core/pipeline.py",
+      "deps": ["T019","T021","T022","T023","T024","T025","T026","T027","T028"],
+      "description": "Implement NoesisPipeline with run(utterances) -> NoesisOutput wiring: separator -> decomposer -> classifier -> selector -> axis analyzer -> vector math -> minority evaluator -> formatter. Single LLMClient injected at construction. No persona choice exposed.",
+      "acceptance_criteria": "End-to-end test with FakeLLMClient returns a NoesisOutput. Pipeline refuses to proceed on any stage failure rather than silently degrading."
+    },
+    {
+      "id": "T030",
+      "title": "api: FastAPI server",
+      "file": "noesis_engine/api/server.py",
+      "deps": ["T029"],
+      "description": "FastAPI app with POST /analyze/text, POST /analyze/audio (gated by audio extra), GET /personas, GET /categories, GET /healthz. Dependency-inject the NoesisPipeline. OpenAPI docs auto-generated.",
+      "acceptance_criteria": "TestClient integration test for each endpoint. Audio endpoint returns 503 when extra not installed."
+    },
+    {
+      "id": "T031",
+      "title": "cli: entry point",
+      "file": "noesis_engine/cli.py",
+      "deps": ["T029"],
+      "description": "Provide 'noesis' console script via pyproject entry point: 'noesis analyze <path>' prints markdown output; '--json' switches format.",
+      "acceptance_criteria": "subprocess test exercises both output modes on a fixture."
+    },
+    {
+      "id": "T032",
+      "title": "ci: GitHub Actions",
+      "file": ".github/workflows/ci.yml",
+      "deps": ["T001"],
+      "description": "Workflow: matrix python 3.10/3.11/3.12, steps: install [dev], ruff check, mypy --strict noesis_engine, pytest -q. No network-dependent tests on CI.",
+      "acceptance_criteria": "Workflow green on a fresh clone. mypy strict passes. ruff clean."
+    },
+    {
+      "id": "T033",
+      "title": "release: PyPI publish workflow",
+      "file": ".github/workflows/publish.yml",
+      "deps": ["T032"],
+      "description": "Tag-triggered workflow using pypa/gh-action-pypi-publish with trusted publishing. Builds sdist + wheel.",
+      "acceptance_criteria": "Dry-run on a pre-release tag uploads to TestPyPI successfully."
+    },
+    {
+      "id": "T034",
+      "title": "tests: integration scenarios",
+      "file": "tests/integration/test_scenarios.py",
+      "deps": ["T029"],
+      "description": "Golden scenarios: budget meeting (4 speakers across four grammars), ethical dilemma, methodology dispute. Use FakeLLMClient with canned persona outputs to assert category, persona set, and minority evaluation presence.",
+      "acceptance_criteria": "All three scenarios produce the expected category and at least one MinorityEvaluation with non-empty preserved_insight."
+    },
+    {
+      "id": "T035",
+      "title": "docs: persona catalog",
+      "file": "docs/PERSONAS.md",
+      "deps": ["T008","T009","T010","T011","T012","T013","T014","T015","T016"],
+      "description": "One page per persona: id, axes (name + one-sentence operational meaning), the question each persona asks of an utterance. No decorative philosophy. Every axis must be answerable from a text utterance.",
+      "acceptance_criteria": "Every persona in PERSONA_REGISTRY is documented. Axes in docs match code (validated by a docs test)."
+    }
+  ]
+}
