@@ -5,7 +5,30 @@ on:
   pull_request:
 
 jobs:
+  lint:
+    name: lint & type-check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install lint tools
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install ruff mypy
+          python -m pip install -e .
+
+      - name: ruff check
+        run: ruff check .
+
+      - name: mypy
+        run: mypy noesis_engine
+
   test:
+    name: test (py${{ matrix.python-version }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: true
@@ -13,19 +36,11 @@ jobs:
         python-version: ["3.11", "3.12"]
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip setuptools wheel
-          python -m pip install -e .
-          python -m pip install pytest pytest-cov pytest-asyncio httpx
 
       - name: Guard against po_core usage
         run: |
@@ -34,5 +49,37 @@ jobs:
             exit 1
           fi
 
-      - name: Run tests
-        run: pytest
+      - name: Install (base only — verifies clean install)
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install -e .
+
+      - name: Smoke test: core import without extras
+        run: python -c "import noesis_engine; print(noesis_engine.__version__)"
+
+      - name: Smoke test: httpx available without extras
+        run: python -c "import httpx"
+
+      - name: Install test dependencies
+        run: python -m pip install pytest pytest-cov pytest-asyncio
+
+      - name: Run tests with coverage
+        run: pytest --cov=noesis_engine --cov-fail-under=80
+
+  build:
+    name: build smoke test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Build distribution
+        run: |
+          python -m pip install --upgrade pip build
+          python -m build
+
+      - name: Verify dist files exist
+        run: ls dist/*.whl dist/*.tar.gz
