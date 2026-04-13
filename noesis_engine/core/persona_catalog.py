@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from types import MappingProxyType
 from typing import Final
 
@@ -452,8 +453,8 @@ _CATEGORY_PERSONA_MAP = {
     ),
 }
 
-PERSONA_CATALOG: Final[dict[PersonaId, PersonaSpec]] = MappingProxyType(_PERSONA_CATALOG)
-CATEGORY_PERSONA_MAP: Final[dict[ConflictCategory, tuple[PersonaId, ...]]] = MappingProxyType(
+PERSONA_CATALOG: Final[Mapping[PersonaId, PersonaSpec]] = MappingProxyType(_PERSONA_CATALOG)
+CATEGORY_PERSONA_MAP: Final[Mapping[ConflictCategory, tuple[PersonaId, ...]]] = MappingProxyType(
     _CATEGORY_PERSONA_MAP
 )
 
