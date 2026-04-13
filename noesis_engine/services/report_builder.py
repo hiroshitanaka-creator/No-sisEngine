@@ -64,7 +64,7 @@ class ReportBuilderService:
             input_diagnostics=input_diagnostics,
             issue_analyses=issue_analyses,
             meeting_level_summary=meeting_level_summary,
-            artifacts=artifacts or {} if include_debug_artifacts else {},
+            artifacts=(artifacts or {}) if include_debug_artifacts else {},
         )
 
     def _build_issue_summary(

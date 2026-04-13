@@ -9,11 +9,13 @@ from noesis_engine.adapters.llm.local_client import LocalLLMClient
 from noesis_engine.adapters.llm.openai_client import OpenAIClient
 from noesis_engine.api.routers.analyze import router as analyze_router
 from noesis_engine.api.schemas.http import HealthResponse
+from noesis_engine.ports.llm import LLMPort
 from noesis_engine.services.pipeline import AnalysisPipeline
 from noesis_engine.settings import Settings, get_settings
 
 
 def _build_default_pipeline(settings: Settings) -> AnalysisPipeline:
+    llm: LLMPort
     if settings.openai.api_key:
         llm = OpenAIClient(settings)
     else:

@@ -7,6 +7,7 @@ from noesis_engine.core.enums import AnalysisStatus
 from noesis_engine.core.schemas import (
     AnalysisReport,
     AudioInput,
+    BridgePoint,
     CategoryResult,
     ClaimUnit,
     DecisionMap,
@@ -14,6 +15,7 @@ from noesis_engine.core.schemas import (
     InputDiagnostics,
     IssueCluster,
     PersonaReading,
+    RejectedOpinionAnalysis,
     RunMetadata,
     SpeakerVector,
     Utterance,
@@ -32,7 +34,11 @@ from noesis_engine.services.persona_router import PersonaRouterService
 from noesis_engine.services.rejected_value_evaluator import RejectedValueEvaluatorService
 from noesis_engine.services.report_builder import ReportBuilderService
 from noesis_engine.services.speaker_segmenter import assign_speakers_to_utterances
-from noesis_engine.services.transcript_normalizer import chunk_transcript, normalize_transcript
+from noesis_engine.services.transcript_normalizer import (
+    TranscriptChunk,
+    chunk_transcript,
+    normalize_transcript,
+)
 from noesis_engine.services.vector_aggregator import VectorAggregatorService
 from noesis_engine.settings import Settings, get_settings
 
@@ -159,8 +165,8 @@ class AnalysisPipeline:
         speaker_vectors: dict[str, list[SpeakerVector]] = {}
         divergences: dict[str, list[DivergencePair]] = {}
         decision_maps: dict[str, DecisionMap] = {}
-        rejected_opinions: dict[str, list[object]] = {}
-        bridge_points: dict[str, list[object]] = {}
+        rejected_opinions: dict[str, list[RejectedOpinionAnalysis]] = {}
+        bridge_points: dict[str, list[BridgePoint]] = {}
 
         for issue in issues:
             issue_claim_list = issue_claims[issue.issue_id]
@@ -219,7 +225,7 @@ class AnalysisPipeline:
 
         run_metadata = RunMetadata(
             run_id=run_id,
-            analysis_model=getattr(self.llm, "model_name", self.settings.locked_analysis_model),
+            analysis_model=self.llm.model_name,
             temperature=self.settings.analysis_temperature,
             status=AnalysisStatus.SUCCESS,
             started_at=started_at,
@@ -227,12 +233,16 @@ class AnalysisPipeline:
         )
 
         include_debug_artifacts = debug or self.settings.include_debug_artifacts
-        artifacts = self._build_debug_artifacts(
-            utterances=utterances,
-            chunks=chunks,
-            claims=claims,
-            issues=issues,
-            categories=categories,
+        artifacts = (
+            self._build_debug_artifacts(
+                utterances=utterances,
+                chunks=chunks,
+                claims=claims,
+                issues=issues,
+                categories=categories,
+            )
+            if include_debug_artifacts
+            else {}
         )
 
         return self.report_builder.build(
@@ -254,7 +264,7 @@ class AnalysisPipeline:
         self,
         *,
         utterances: list[Utterance],
-        chunks: list[object],
+        chunks: list[TranscriptChunk],
         claims: list[ClaimUnit],
         issues: list[IssueCluster],
         categories: dict[str, CategoryResult],

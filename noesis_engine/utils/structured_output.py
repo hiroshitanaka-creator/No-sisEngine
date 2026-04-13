@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Generic
 
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel
 
 from noesis_engine.ports.llm import (
     LLMPort,

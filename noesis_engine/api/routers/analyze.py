@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import cast
+
 from fastapi import APIRouter, HTTPException, Request
 
 from noesis_engine.api.schemas.http import (
@@ -15,7 +17,7 @@ router = APIRouter(prefix="/analyze", tags=["analyze"])
 
 
 def _get_pipeline(request: Request) -> AnalysisPipeline:
-    pipeline = getattr(request.app.state, "pipeline", None)
+    pipeline = cast(AnalysisPipeline | None, getattr(request.app.state, "pipeline", None))
     if pipeline is None:
         raise HTTPException(status_code=503, detail="Analysis pipeline is not configured.")
     return pipeline

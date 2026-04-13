@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any, Mapping
 
@@ -34,7 +35,7 @@ def normalize_text(value: str) -> str:
 
 
 def normalize_transcript(
-    utterances: list[Utterance | Mapping[str, Any]],
+    utterances: Sequence[Utterance | Mapping[str, Any]],
 ) -> list[Utterance]:
     normalized: list[Utterance] = []
     for index, item in enumerate(utterances, start=1):
@@ -126,7 +127,7 @@ def chunk_transcript(
 
 
 def normalize_and_chunk_transcript(
-    utterances: list[Utterance | Mapping[str, Any]],
+    utterances: Sequence[Utterance | Mapping[str, Any]],
     *,
     max_chars: int,
     overlap_chars: int,
